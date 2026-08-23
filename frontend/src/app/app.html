@@ -1,0 +1,99 @@
+<div class="app-layout">
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="header-brand">
+      <div class="brand-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a8 8 0 0 0-8 8c0 5.25 7 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"/>
+          <circle cx="12" cy="10" r="3"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="brand-title">Visionary Lab Partner</h1>
+        <p class="brand-subtitle">Autonomous Interactive AI Assistant</p>
+      </div>
+    </div>
+    <div class="status-badge">
+      <span class="status-dot"></span>
+      <span class="status-text">Connected</span>
+    </div>
+  </header>
+
+  <main class="main-content split-layout">
+    <!-- LEFT PANEL: 3D Character Viewport -->
+    <div class="panel left-panel">
+      <div class="character-card">
+        <div class="stage-overlay">
+          <div class="stage-tag">
+            <span class="pulse-ring"></span>
+            3D INTERACTIVE AVATAR
+          </div>
+        </div>
+        <app-talking-character [audioVolume]="(agentService.currentVolume$ | async) || 0">
+        </app-talking-character>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL: Transcript & Chat Controls -->
+    <div class="panel right-panel">
+      <div class="chat-card">
+        <div class="chat-header">
+          <svg xmlns="http://www.w3.org/2000/svg" class="chat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          <span>Conversation History</span>
+        </div>
+
+        <div class="transcript-box" #scrollContainer>
+          <!-- Empty State -->
+          <div *ngIf="messages.length === 0" class="empty-state">
+            <div class="empty-icon">💬</div>
+            <p>No messages yet.</p>
+            <span>Type a message or click the microphone to start talking with your partner.</span>
+          </div>
+
+          <!-- Chat Messages -->
+          <div *ngFor="let msg of messages" class="message-row" [ngClass]="msg.role">
+            <div class="avatar-badge" [title]="msg.role === 'user' ? 'You' : 'Agent'">
+              <span *ngIf="msg.role === 'user'">👤</span>
+              <span *ngIf="msg.role !== 'user'">🤖</span>
+            </div>
+            <div class="message-bubble">
+              <div class="message-sender">{{ msg.role === 'user' ? 'You' : 'Visionary Agent' }}</div>
+              <div class="message-text">{{ msg.text }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- User Controls Bar -->
+        <div class="controls-bar">
+          <div class="input-wrapper">
+            <input
+              type="text"
+              class="chat-input"
+              [(ngModel)]="interimText"
+              placeholder="Type your prompt or speak..."
+              (keyup.enter)="sendMessage(interimText)"
+            />
+            <button class="send-btn" (click)="sendMessage(interimText)" [disabled]="!interimText || interimText.trim() === ''">
+              <span>Send</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"/>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
+            </button>
+          </div>
+
+          <button class="mic-btn" (click)="toggleListening()" [class.mic-listening]="isListening">
+            <svg xmlns="http://www.w3.org/2000/svg" class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="22"/>
+            </svg>
+            <span>{{ isListening ? 'Listening...' : 'Talk' }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>

@@ -22,8 +22,8 @@ from google.adk.runners import InMemoryRunner
 from google.genai import types 
 from google.genai.errors import ServerError, APIError
 
-# 3. Import your agent definition
-from collaborative_partner.agent import collaborative_agent
+# 3. Import your agent definition & context variable
+from collaborative_partner.agent import collaborative_agent, current_guest_id
 
 # Initialize FastAPI App & CORS
 app = FastAPI(title="VerityLens Agent Server")
@@ -140,19 +140,45 @@ async def chat_endpoint(websocket: WebSocket):
     await websocket.accept()
     print("Frontend connected via WebSocket.")
     
-    # Create a fresh memory session for this specific WebSocket connection
-    session = await runner.session_service.create_session(
-        app_name="hackathon_app", 
-        user_id="demo_user"
-    )
-    
     try:
         while True:
-            user_message = await websocket.receive_text()
+            raw_data = await websocket.receive_text()
+            if not raw_data.strip():
+                continue
+                
+            # 1. Parse the JSON sent from Angular
+            try:
+                payload = json.loads(raw_data)
+                guest_id = payload.get("guest_id", "demo_user")
+                user_message = payload.get("message", "")
+            except json.JSONDecodeError:
+                # Fallback just in case plain text is sent during testing
+                guest_id = "demo_user"
+                user_message = raw_data
+
             if not user_message.strip():
                 continue
                 
-            print(f"\nUser asked: {user_message}")
+            print(f"\n[{guest_id}] asked: {user_message}")
+            
+            # 2. Set the context variable so save_user_preference() can access it!
+            current_guest_id.set(guest_id)
+            
+            # 3. Create or retrieve the ADK memory session dynamically for THIS guest
+            existing_sessions = await runner.session_service.list_sessions(
+                app_name="hackathon_app", 
+                user_id=guest_id
+            )
+            
+            if hasattr(existing_sessions, "sessions") and len(existing_sessions.sessions) > 0:
+                session = existing_sessions.sessions[0]
+            elif isinstance(existing_sessions, list) and len(existing_sessions) > 0:
+                session = existing_sessions[0]
+            else:
+                session = await runner.session_service.create_session(
+                    app_name="hackathon_app", 
+                    user_id=guest_id
+                )
             
             # Format the raw string into the Content payload the ADK expects
             content = types.Content(
@@ -160,7 +186,7 @@ async def chat_endpoint(websocket: WebSocket):
                 parts=[types.Part(text=user_message)]
             )
             
-            # Run the agent with exponential backoff retries for transient server errors (e.g. 502 Bad Gateway)
+            # Run the agent with exponential backoff retries
             answer_text = ""
             max_retries = 3
             backoff = 2
@@ -193,11 +219,11 @@ async def chat_endpoint(websocket: WebSocket):
                 audio_base64 = await asyncio.to_thread(generate_audio, answer_text)
                 
                 # Package and transmit back to Angular
-                payload = {
+                response_payload = {
                     "text": answer_text,
                     "audio": audio_base64
                 }
-                await websocket.send_text(json.dumps(payload))
+                await websocket.send_text(json.dumps(response_payload))
 
             except (ServerError, APIError) as e:
                 print(f"[Error] Gemini API failure: {e}")

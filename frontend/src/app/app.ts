@@ -28,8 +28,8 @@ export class App implements OnInit {
 
   ngOnInit() {
     // Connect to your deployed Cloud Run FastAPI server
-    const websocketUrl = window.location.hostname === 'localhost'
-      ? 'wss://veritylens-backend-563576709291.us-central1.run.app/chat'
+    const websocketUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? 'ws://localhost:8000/chat'
       : 'wss://veritylens-backend-563576709291.us-central1.run.app/chat';
     this.agentService.connect(websocketUrl);
 

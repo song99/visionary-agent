@@ -14,8 +14,22 @@ export class AgentService {
   private analyser!: AnalyserNode;
   private isAnalyzing = false;
 
+  // Property to hold the user's anonymous session ID
+  private guestId!: string;
+
   constructor(private ngZone: NgZone) {
     this.initAudio();
+    this.initGuestId();
+  }
+
+  private initGuestId() {
+    // Retrieve the existing ID, or generate and store a new one if it doesn't exist
+    let storedId = localStorage.getItem('guest_id');
+    if (!storedId) {
+      storedId = 'guest_' + Math.random().toString(36).substring(2, 10);
+      localStorage.setItem('guest_id', storedId);
+    }
+    this.guestId = storedId;
   }
 
   private initAudio() {
@@ -60,7 +74,12 @@ export class AgentService {
 
   public sendMessage(text: string) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(text);
+      // Send both the isolated guest ID and the user's message as a JSON string
+      const payload = {
+        guest_id: this.guestId,
+        message: text
+      };
+      this.ws.send(JSON.stringify(payload));
     } else {
       console.error("WebSocket is not open!");
     }

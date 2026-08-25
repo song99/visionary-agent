@@ -66,7 +66,7 @@ npm start
 
 ---
 
-## 🎙️ Microphone & Privacy Settings
+## Microphone & Privacy Settings
 
 Visionary Agent utilizes the browser's native Web Audio and MediaDevices APIs to enable seamless, voice-driven interaction. To ensure the avatar can hear you and play audio responses, you must grant the necessary privacy permissions.
 
@@ -86,5 +86,5 @@ If the browser has permission but the agent still cannot hear you, your operatin
 ### 3. Audio Playback (Autoplay Policy)
 Modern browsers enforce strict autoplay policies to prevent spam. You will not hear the 3D avatar speak until you interact with the page at least once (e.g., clicking the chat input box or hitting the "Ask" button). This initial user gesture unlocks the `AudioContext` so the agent can synthesize speech.
 
-### ⚠️ Important Note for Deployment
+### Important Note for Deployment
 If you are hosting the frontend on a custom server instead of Firebase Hosting, the application **must** be served over `HTTPS`. Browsers will automatically block microphone access on standard `HTTP` connections for security reasons (with the sole exception being `localhost` during local development).

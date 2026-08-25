@@ -65,31 +65,38 @@ def save_user_preference(key: str, value: str) -> str:
     """Saves a user preference, fact, or detail to long-term memory for the active user.
     Use this whenever the user shares facts about themselves, their preferences, name, or role.
     """
+    guest_id = current_guest_id.get()
     try:
-        guest_id = current_guest_id.get()
+        print(f"[Firestore Memory] Saving preference for '{guest_id}': {key} = {value}")
         firestore_db = get_db()
         firestore_db.collection("user_preferences").document(guest_id).set(
             {key: value}, merge=True
         )
+        print(f"[Firestore Memory] Successfully saved '{key}' for '{guest_id}'")
         return f"Saved preference: '{key}' = '{value}' for user {guest_id}."
     except Exception as e:
+        print(f"[Firestore Memory Error] Failed to save preference for '{guest_id}': {e}")
         return f"Failed to save user preference: {str(e)}"
 
 def get_user_preferences() -> str:
     """Retrieves all stored preferences, details, and facts about the active user.
     Use this to recall details about the user when asked or when personalizing responses.
     """
+    guest_id = current_guest_id.get()
     try:
-        guest_id = current_guest_id.get()
+        print(f"[Firestore Memory] Fetching preferences for '{guest_id}'")
         firestore_db = get_db()
         doc = firestore_db.collection("user_preferences").document(guest_id).get()
         if doc.exists:
             data = doc.to_dict()
             if data:
                 prefs = ", ".join([f"{k}: {v}" for k, v in data.items()])
+                print(f"[Firestore Memory] Retrieved for '{guest_id}': {prefs}")
                 return f"User preferences: {prefs}"
+        print(f"[Firestore Memory] No stored preferences found for '{guest_id}'")
         return "No saved preferences found for this user."
     except Exception as e:
+        print(f"[Firestore Memory Error] Failed to fetch preferences for '{guest_id}': {e}")
         return f"Failed to retrieve user preferences: {str(e)}"
 
 # ==========================================
@@ -101,12 +108,14 @@ collaborative_agent = Agent(
     model="gemini-3.5-flash",
     instruction=(
         "You are a helpful, collaborative virtual partner. "
-        "You query the knowledge base before answering organizational or factual questions. "
-        "You can save and retrieve user preferences, facts, and details using your tools to personalize conversations. "
-        "IMPORTANT FOR SPEECH SYNTHESIS: "
-        "1. Write in plain conversational text only—do NOT use Markdown formatting like asterisks (*), hashtags (#), or bullet points. "
-        "2. Use short, clear sentences with proper periods and commas so the text-to-speech engine can parse it easily. "
-        "3. Keep your answers brief and concise."
+        "1. USER MEMORY & PREFERENCES: "
+        "   - Whenever the user mentions any personal detail, name, nickname, role, or preference, ALWAYS call the save_user_preference tool to save it. "
+        "   - Whenever the user asks what you know about them or asks a question about their identity/preferences, ALWAYS call the get_user_preferences tool first. "
+        "2. KNOWLEDGE BASE: You query the knowledge base before answering organizational or factual questions. "
+        "3. IMPORTANT FOR SPEECH SYNTHESIS: "
+        "   - Write in plain conversational text only—do NOT use Markdown formatting like asterisks (*), hashtags (#), or bullet points. "
+        "   - Use short, clear sentences with proper periods and commas so the text-to-speech engine can parse it easily. "
+        "   - Keep your answers brief and concise."
     ),
     tools=[search_knowledge_base, save_user_preference, get_user_preferences],
     generate_content_config=types.GenerateContentConfig(temperature=0.3)

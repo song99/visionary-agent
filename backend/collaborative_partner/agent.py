@@ -19,7 +19,8 @@ ai_client = None
 def get_db():
     global db
     if db is None:
-        db = firestore.Client()
+        project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "visionary-agent")
+        db = firestore.Client(project=project_id)
     return db
 
 def get_ai_client():

@@ -1,5 +1,5 @@
-import { Component, OnInit, NgZone, signal } from '@angular/core';
-import { AgentService } from './services/agent';
+import { Component, OnInit, NgZone, signal, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
+import { AgentService, ConnectionStatus } from './services/agent';
 
 // Tell TypeScript about the native browser API
 declare var webkitSpeechRecognition: any;
@@ -10,11 +10,15 @@ declare var webkitSpeechRecognition: any;
   standalone: false,
   styleUrl: './app.css',
 })
-export class App implements OnInit {
+export class App implements OnInit, AfterViewChecked {
+
+  @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
 
   protected readonly title = signal('agent-frontend');
 
   messages: { role: string, text: string }[] = [];
+  connectionStatus: ConnectionStatus = 'disconnected';
+  private shouldScrollToBottom = false;
 
   // Speech Recognition State
   isListening = false;
@@ -31,14 +35,36 @@ export class App implements OnInit {
     const websocketUrl = 'wss://agent-backend-563576709291.us-central1.run.app/chat';
     this.agentService.connect(websocketUrl);
 
+    this.agentService.connectionStatus$.subscribe((status) => {
+      this.ngZone.run(() => {
+        this.connectionStatus = status;
+      });
+    });
+
     // Listen for agent replies and add them to the chat
     this.agentService.transcript$.subscribe((text) => {
       this.ngZone.run(() => {
         this.messages.push({ role: 'agent', text });
+        this.shouldScrollToBottom = true;
       });
     });
 
     this.initSpeechRecognition();
+  }
+
+  ngAfterViewChecked() {
+    if (this.shouldScrollToBottom) {
+      this.scrollToBottom();
+      this.shouldScrollToBottom = false;
+    }
+  }
+
+  private scrollToBottom(): void {
+    try {
+      if (this.scrollContainer && this.scrollContainer.nativeElement) {
+        this.scrollContainer.nativeElement.scrollTop = this.scrollContainer.nativeElement.scrollHeight;
+      }
+    } catch (err) { }
   }
 
   initSpeechRecognition() {
@@ -112,5 +138,6 @@ export class App implements OnInit {
     this.messages.push({ role: 'user', text: text });
     this.agentService.sendMessage(text);
     this.interimText = '';
+    this.shouldScrollToBottom = true;
   }
 }

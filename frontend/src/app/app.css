@@ -69,6 +69,7 @@
   background: rgba(16, 185, 129, 0.1);
   border: 1px solid rgba(16, 185, 129, 0.25);
   border-radius: 20px;
+  transition: all 0.3s ease;
 }
 
 .status-dot {
@@ -77,6 +78,7 @@
   border-radius: 50%;
   background-color: #10b981;
   box-shadow: 0 0 8px #10b981;
+  transition: all 0.3s ease;
 }
 
 .status-text {
@@ -85,6 +87,35 @@
   color: #34d399;
   letter-spacing: 0.03em;
   text-transform: uppercase;
+  transition: all 0.3s ease;
+}
+
+.status-badge.connecting {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+.status-badge.connecting .status-dot {
+  background-color: #f59e0b;
+  box-shadow: 0 0 8px #f59e0b;
+}
+
+.status-badge.connecting .status-text {
+  color: #fbbf24;
+}
+
+.status-badge.disconnected {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.status-badge.disconnected .status-dot {
+  background-color: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
+}
+
+.status-badge.disconnected .status-text {
+  color: #f87171;
 }
 
 /* --- 2-Panel Split Layout --- */
@@ -193,6 +224,7 @@
   flex-direction: column;
   gap: 14px;
   padding-right: 6px;
+  scroll-behavior: smooth;
 }
 
 .empty-state {

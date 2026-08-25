@@ -1,6 +1,8 @@
 import { Injectable, NgZone } from '@angular/core';
 import { BehaviorSubject, Subject } from 'rxjs';
 
+export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected';
+
 @Injectable({
   providedIn: 'root'
 })
@@ -8,8 +10,16 @@ export class AgentService {
   // Observables that your components will subscribe to
   public currentVolume$ = new BehaviorSubject<number>(0);
   public transcript$ = new Subject<string>();
+  public connectionStatus$ = new BehaviorSubject<ConnectionStatus>('disconnected');
 
-  private ws!: WebSocket;
+  private ws?: WebSocket;
+  private websocketUrl?: string;
+  private messageQueue: string[] = [];
+  private reconnectTimer?: any;
+  private reconnectDelay = 1000;
+  private maxReconnectDelay = 16000;
+  private isExplicitlyClosed = false;
+
   private audioCtx!: AudioContext;
   private analyser!: AnalyserNode;
   private isAnalyzing = false;
@@ -52,37 +62,121 @@ export class AgentService {
   }
 
   public connect(websocketUrl: string) {
-    this.ws = new WebSocket(websocketUrl);
+    this.websocketUrl = websocketUrl;
+    this.isExplicitlyClosed = false;
+
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = undefined;
+    }
+
+    this.connectionStatus$.next('connecting');
+
+    try {
+      this.ws = new WebSocket(websocketUrl);
+    } catch (err) {
+      console.error('Failed to create WebSocket:', err);
+      this.connectionStatus$.next('disconnected');
+      this.scheduleReconnect();
+      return;
+    }
+
+    this.ws.onopen = () => {
+      console.log('WebSocket Connection Established');
+      this.connectionStatus$.next('connected');
+      this.reconnectDelay = 1000;
+      this.flushQueue();
+    };
 
     this.ws.onmessage = async (event) => {
-      const data = JSON.parse(event.data);
+      try {
+        const data = JSON.parse(event.data);
 
-      if (data.text) {
-        // Push the text to the UI transcript panel immediately
-        this.transcript$.next(data.text);
-      }
+        if (data.text) {
+          // Push the text to the UI transcript panel immediately
+          this.transcript$.next(data.text);
+        }
 
-      if (data.audio) {
-        // Decode and play the audio, then start the lip-sync analysis loop
-        await this.playBase64Audio(data.audio);
+        if (data.audio) {
+          // Decode and play the audio, then start the lip-sync analysis loop
+          await this.playBase64Audio(data.audio);
+        }
+      } catch (err) {
+        console.error('Error parsing WebSocket message:', err);
       }
     };
 
     this.ws.onerror = (error) => console.error('WebSocket Error:', error);
-    this.ws.onclose = () => console.log('WebSocket Connection Closed');
+
+    this.ws.onclose = (event) => {
+      console.log('WebSocket Connection Closed:', event.code, event.reason);
+      this.connectionStatus$.next('disconnected');
+      if (!this.isExplicitlyClosed) {
+        this.scheduleReconnect();
+      }
+    };
+  }
+
+  private scheduleReconnect() {
+    if (this.reconnectTimer || this.isExplicitlyClosed || !this.websocketUrl) return;
+
+    console.log(`Reconnecting WebSocket in ${this.reconnectDelay}ms...`);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = undefined;
+      this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
+      if (this.websocketUrl) {
+        this.connect(this.websocketUrl);
+      }
+    }, this.reconnectDelay);
+  }
+
+  private flushQueue() {
+    while (this.messageQueue.length > 0 && this.ws && this.ws.readyState === WebSocket.OPEN) {
+      const text = this.messageQueue.shift();
+      if (text) {
+        this.sendPayload(text);
+      }
+    }
   }
 
   public sendMessage(text: string) {
+    if (!text || text.trim() === '') return;
+
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      // Send both the isolated guest ID and the user's message as a JSON string
-      const payload = {
-        guest_id: this.guestId,
-        message: text
-      };
-      this.ws.send(JSON.stringify(payload));
+      this.sendPayload(text);
     } else {
-      console.error("WebSocket is not open!");
+      console.warn("WebSocket is not open. Queuing message for when connection is ready:", text);
+      this.messageQueue.push(text);
+      if (!this.ws || this.ws.readyState === WebSocket.CLOSED) {
+        if (this.websocketUrl) {
+          this.connect(this.websocketUrl);
+        }
+      }
     }
+  }
+
+  private sendPayload(text: string) {
+    const payload = {
+      guest_id: this.guestId,
+      message: text
+    };
+    this.ws?.send(JSON.stringify(payload));
+  }
+
+  public disconnect() {
+    this.isExplicitlyClosed = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = undefined;
+    }
+    if (this.ws) {
+      this.ws.close();
+    }
+    this.connectionStatus$.next('disconnected');
   }
 
   private async playBase64Audio(base64String: string) {

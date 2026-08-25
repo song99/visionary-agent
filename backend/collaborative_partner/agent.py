@@ -1,3 +1,4 @@
+import os
 from contextvars import ContextVar
 from google.cloud import firestore
 from google.cloud.firestore_v1.vector import Vector

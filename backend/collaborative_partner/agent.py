@@ -12,17 +12,32 @@ current_guest_id: ContextVar[str] = ContextVar("current_guest_id", default="defa
 # ==========================================
 # 1. FIRESTORE KNOWLEDGE BASE & MEMORY
 # ==========================================
-# Initialize clients (they inherit credentials loaded in main.py)
-db = firestore.Client()
-ai_client = genai.Client()
+# Lazy client getters to prevent startup container crashes
+db = None
+ai_client = None
+
+def get_db():
+    global db
+    if db is None:
+        db = firestore.Client()
+    return db
+
+def get_ai_client():
+    global ai_client
+    if ai_client is None:
+        ai_client = genai.Client()
+    return ai_client
 
 def search_knowledge_base(query: str) -> str:
     """Searches the organizational knowledge base for context.
     Use this to look up facts, policies, or specific organizational knowledge.
     """
     try:
+        client = get_ai_client()
+        firestore_db = get_db()
+
         # Convert the user query into a vector embedding
-        response = ai_client.models.embed_content(
+        response = client.models.embed_content(
             model="gemini-embedding-001",
             contents=query,
             config={"output_dimensionality": 768}
@@ -30,7 +45,7 @@ def search_knowledge_base(query: str) -> str:
         query_embedding = response.embeddings[0].values
 
         # Perform a similarity search in Firestore
-        collection_ref = db.collection("knowledge_base")
+        collection_ref = firestore_db.collection("knowledge_base")
         vector_query = collection_ref.find_nearest(
             vector_field="embedding",
             query_vector=Vector(query_embedding),
@@ -52,7 +67,8 @@ def save_user_preference(key: str, value: str) -> str:
     """
     try:
         guest_id = current_guest_id.get()
-        db.collection("user_preferences").document(guest_id).set(
+        firestore_db = get_db()
+        firestore_db.collection("user_preferences").document(guest_id).set(
             {key: value}, merge=True
         )
         return f"Saved preference: '{key}' = '{value}' for user {guest_id}."
@@ -65,7 +81,8 @@ def get_user_preferences() -> str:
     """
     try:
         guest_id = current_guest_id.get()
-        doc = db.collection("user_preferences").document(guest_id).get()
+        firestore_db = get_db()
+        doc = firestore_db.collection("user_preferences").document(guest_id).get()
         if doc.exists:
             data = doc.to_dict()
             if data:

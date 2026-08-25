@@ -34,7 +34,7 @@ export class TalkingCharacterComponent implements AfterViewInit, OnDestroy {
   private headNode: THREE.Object3D | null = null;
   private mouthOpenIndex: number = -1;
   private animationFrameId: number = 0;
-  private clock = new THREE.Clock();
+  private timer = new THREE.Timer();
 
   // Initial head transforms
   private initialHeadRotation = new THREE.Euler();
@@ -184,9 +184,10 @@ export class TalkingCharacterComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  private animate = () => {
+  private animate = (timestamp?: number) => {
     this.animationFrameId = requestAnimationFrame(this.animate);
-    const elapsedTime = this.clock.getElapsedTime();
+    this.timer.update(timestamp);
+    const elapsedTime = this.timer.getElapsed();
 
     // --- 1. MOUTH & LIP SYNC ---
     if (this.headMesh && this.mouthOpenIndex !== -1 && this.headMesh.morphTargetInfluences) {
@@ -312,6 +313,9 @@ export class TalkingCharacterComponent implements AfterViewInit, OnDestroy {
       this.resizeObserver.disconnect();
     }
     cancelAnimationFrame(this.animationFrameId);
+    if (this.timer) {
+      this.timer.dispose();
+    }
     if (this.renderer) {
       this.renderer.dispose();
     }

@@ -30,7 +30,7 @@ export class AvatarComponent implements OnInit, AfterViewInit, OnDestroy {
   private scene = new THREE.Scene();
   private camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
   private renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  private clock = new THREE.Clock();
+  private timer = new THREE.Timer();
   private animationFrameId: number = 0;
 
   // Avatar Rigging
@@ -55,6 +55,7 @@ export class AvatarComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     cancelAnimationFrame(this.animationFrameId);
+    this.timer.dispose();
     this.renderer.dispose();
   }
 
@@ -108,9 +109,10 @@ export class AvatarComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  private startAnimationLoop = (): void => {
+  private startAnimationLoop = (timestamp?: number): void => {
     this.animationFrameId = requestAnimationFrame(this.startAnimationLoop);
-    const time = this.clock.getElapsedTime();
+    this.timer.update(timestamp);
+    const time = this.timer.getElapsed();
 
     // --- 1. HEAD SWAY ---
     if (this.headBone) {
